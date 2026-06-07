@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(TEACHER)
+  teacher   Teacher?
+  student   Student?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleBlocks  ScheduleBlock[]
+  gradeRecords    GradeRecord[]
+  qualifications  TeacherQualification[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Student {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentId       String           @unique
+  gradeLevel      String           // G11 or G12
+  sectionId       String
+  section         Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  gradeRecords    GradeRecord[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Subject {
+  id             String           @id @default(cuid())
+  name           String
+  gradeLevel     String           // G11 or G12
+  track          String?          // ABM, HUMSS, STEM, etc.
+  scheduleBlocks ScheduleBlock[]
+  gradeRecords   GradeRecord[]
+  qualifications TeacherQualification[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model TimeSlot {
+  id             String           @id @default(cuid())
+  day            String           // Monday, Tuesday, etc.
+  startTime      String           // HH:MM format
+  endTime        String           // HH:MM format
+  scheduleBlocks ScheduleBlock[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Section {
+  id             String           @id @default(cuid())
+  name           String           // e.g., ABM-ARISTOTLE, HUMSS-AURELIUS
+  gradeLevel     String           // G11 or G12
+  track          String           // ABM, HUMSS, STEM, etc.
+  scheduleBlocks ScheduleBlock[]
+  students       Student[]
+  gradeRecords   GradeRecord[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model GradeRecord {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId      String
+  teacher        Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId      String
+  subject        Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sectionId      String
+  section        Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  gradingPeriod  String   // e.g. Quarter 1, Quarter 2
+  academicYear   String   // e.g. 2026-2027
+  score          Float
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, subjectId, gradingPeriod, academicYear])
+  @@index([sectionId, subjectId])
+}
+
+model ScheduleBlock {
+  id         String    @id @default(cuid())
+  teacherId  String
+  teacher    Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  timeSlotId String
+  timeSlot   TimeSlot  @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  sectionId  String
+  section    Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  room       String?   // Optional room number
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([teacherId, timeSlotId])
+  @@unique([sectionId, timeSlotId])
+}
+
+model TeacherQualification {
+  id         String   @id @default(cuid())
+  teacherId  String
+  teacher    Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  position   String?  // Optional position/qualification note
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([teacherId, subjectId])
+}

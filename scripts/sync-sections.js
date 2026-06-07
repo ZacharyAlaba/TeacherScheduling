@@ -1,0 +1,62 @@
+const fs = require("fs");
+const path = require("path");
+const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
+
+function normalize(name) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+(async () => {
+  try {
+    const csvPath = path.resolve("..", "data", "sections.csv");
+    const raw = fs.readFileSync(csvPath, "utf8");
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+
+    if (lines.length <= 1) {
+      console.log("No data rows found in sections.csv");
+      process.exit(0);
+    }
+
+    let created = 0;
+    let existing = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const parts = line.split(",");
+      const gradeLevel = (parts[0] || "").trim();
+      const name = normalize(parts[1] || "");
+      const track = (parts[2] || "").trim();
+
+      if (!gradeLevel || !name || !track) continue;
+
+      const found = await prisma.section.findFirst({
+        where: { gradeLevel, name },
+      });
+
+      if (found) {
+        existing++;
+        continue;
+      }
+
+      await prisma.section.create({
+        data: {
+          gradeLevel,
+          name,
+          track,
+        },
+      });
+      created++;
+    }
+
+    console.log(`Sections sync complete. Created: ${created}, Existing: ${existing}`);
+  } catch (error) {
+    console.error("Sections sync failed:", error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+})();
