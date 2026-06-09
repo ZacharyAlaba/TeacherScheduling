@@ -26,14 +26,14 @@ type SubjectItem = {
   track: string | null;
 };
 
-type GradeRecord = {
+type AttendanceRecord = {
   id: string;
   studentId: string;
   subjectId: string;
   sectionId: string;
   gradingPeriod: string;
   academicYear: string;
-  score: number;
+  status: string;
   remarks?: string | null;
   student: {
     id: string;
@@ -46,17 +46,17 @@ type GradeRecord = {
   };
 };
 
-export default function TeacherGradesPage() {
+export default function TeacherAttendancePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [academicYear, setAcademicYear] = useState("");
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
-  const [gradeRecords, setGradeRecords] = useState<GradeRecord[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [gradingPeriod, setGradingPeriod] = useState("Quarter 1");
-  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
   const [remarksDrafts, setRemarksDrafts] = useState<Record<string, string>>({});
   const [savingStudentId, setSavingStudentId] = useState<string>("");
   const [message, setMessage] = useState("");
@@ -75,9 +75,9 @@ export default function TeacherGradesPage() {
 
     let cancelled = false;
 
-    async function loadGrades() {
+    async function loadAttendance() {
       try {
-        const response = await fetch("/api/teacher/grades", { cache: "no-store" });
+        const response = await fetch("/api/teacher/attendance", { cache: "no-store" });
         if (!response.ok) {
           return;
         }
@@ -90,14 +90,14 @@ export default function TeacherGradesPage() {
         setAcademicYear(data.academicYear || "");
         setSections(data.sections || []);
         setSubjects(data.subjects || []);
-        setGradeRecords(data.gradeRecords || []);
+        setAttendanceRecords(data.attendanceRecords || []);
 
         const firstSection = data.sections?.[0];
         if (firstSection) {
           setSelectedSectionId((current) => current || firstSection.id);
         }
       } catch (error) {
-        console.error("Failed to load grades:", error);
+        console.error("Failed to load attendance:", error);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -105,7 +105,7 @@ export default function TeacherGradesPage() {
       }
     }
 
-    loadGrades();
+    loadAttendance();
     return () => {
       cancelled = true;
     };
@@ -135,41 +135,41 @@ export default function TeacherGradesPage() {
   const selectedStudents = selectedSection?.students || [];
 
   const recordLookup = useMemo(() => {
-    const map = new Map<string, GradeRecord>();
-    gradeRecords.forEach((record) => {
+    const map = new Map<string, AttendanceRecord>();
+    attendanceRecords.forEach((record) => {
       const key = `${record.studentId}-${record.subjectId}-${record.gradingPeriod}`;
       map.set(key, record);
     });
     return map;
-  }, [gradeRecords]);
+  }, [attendanceRecords]);
 
   useEffect(() => {
-    const nextScores: Record<string, string> = {};
+    const nextStatus: Record<string, string> = {};
     const nextRemarks: Record<string, string> = {};
 
     selectedStudents.forEach((student) => {
       const record = recordLookup.get(`${student.id}-${selectedSubjectId}-${gradingPeriod}`);
       if (record) {
-        nextScores[student.id] = String(record.score);
+        nextStatus[student.id] = String(record.status || "");
         nextRemarks[student.id] = record.remarks || "";
       } else {
-        nextScores[student.id] = "";
+        nextStatus[student.id] = "";
         nextRemarks[student.id] = "";
       }
     });
 
-    setScoreDrafts(nextScores);
+    setStatusDrafts(nextStatus);
     setRemarksDrafts(nextRemarks);
   }, [selectedStudents, selectedSubjectId, gradingPeriod, recordLookup]);
 
-  async function saveGrade(studentId: string) {
+  async function saveAttendance(studentId: string) {
     if (!selectedSectionId || !selectedSubjectId || !selectedSection) {
       return;
     }
 
-    const score = Number(scoreDrafts[studentId]);
-    if (Number.isNaN(score)) {
-      setMessage("Enter a valid score first.");
+    const statusValue = statusDrafts[studentId];
+    if (!statusValue) {
+      setMessage("Select a status first.");
       return;
     }
 
@@ -177,7 +177,7 @@ export default function TeacherGradesPage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/teacher/grades", {
+      const response = await fetch("/api/teacher/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,7 +185,7 @@ export default function TeacherGradesPage() {
           subjectId: selectedSubjectId,
           sectionId: selectedSectionId,
           gradingPeriod,
-          score,
+          status: statusValue,
           remarks: remarksDrafts[studentId] || "",
           academicYear,
         }),
@@ -193,25 +193,20 @@ export default function TeacherGradesPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        setMessage(data.message || "Failed to save grade");
+        setMessage(data.message || "Failed to save attendance");
         return;
       }
 
-      setGradeRecords((current) => {
+      setAttendanceRecords((current) => {
         const next = current.filter(
-          (record) =>
-            !(
-              record.studentId === studentId &&
-              record.subjectId === selectedSubjectId &&
-              record.gradingPeriod === gradingPeriod
-            )
+          (record) => !(record.studentId === studentId && record.subjectId === selectedSubjectId && record.gradingPeriod === gradingPeriod)
         );
         next.unshift(data);
         return next;
       });
-      setMessage("Grade saved successfully.");
+      setMessage("Attendance saved successfully.");
     } catch (error) {
-      setMessage("Failed to save grade");
+      setMessage("Failed to save attendance");
     } finally {
       setSavingStudentId("");
     }
@@ -220,7 +215,7 @@ export default function TeacherGradesPage() {
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600">
-        Loading gradebook...
+        Loading attendance...
       </div>
     );
   }
@@ -234,9 +229,9 @@ export default function TeacherGradesPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-slate-700 bg-slate-900/70 p-6 shadow-2xl backdrop-blur md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Teacher Gradebook</p>
-            <h1 className="mt-2 text-3xl font-semibold">Enter and manage grades</h1>
-            <p className="mt-2 text-sm text-slate-400">Quarter-based grading for {session?.user?.name || "teacher"}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Teacher Attendance</p>
+            <h1 className="mt-2 text-3xl font-semibold">Record and manage attendance</h1>
+            <p className="mt-2 text-sm text-slate-400">Quarter-based attendance for {session?.user?.name || "teacher"}</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -264,8 +259,8 @@ export default function TeacherGradesPage() {
             <p className="mt-2 text-2xl font-semibold">{sections.length}</p>
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Grade Records</p>
-            <p className="mt-2 text-2xl font-semibold">{gradeRecords.length}</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Attendance Records</p>
+            <p className="mt-2 text-2xl font-semibold">{attendanceRecords.length}</p>
           </div>
         </div>
 
@@ -326,10 +321,8 @@ export default function TeacherGradesPage() {
         <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-900/70 p-6 shadow-2xl overflow-hidden">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold">Student Grades</h2>
-              <p className="text-sm text-slate-400">
-                {selectedSection?.name || "Select a section"} · {gradingPeriod}
-              </p>
+              <h2 className="text-2xl font-semibold">Student Attendance</h2>
+              <p className="text-sm text-slate-400">{selectedSection?.name || "Select a section"} · {gradingPeriod}</p>
             </div>
             <p className="text-sm text-slate-400">{selectedStudents.length} students</p>
           </div>
@@ -340,7 +333,7 @@ export default function TeacherGradesPage() {
                 <tr className="border-b border-slate-700 text-left text-xs uppercase tracking-[0.18em] text-slate-400">
                   <th className="py-3 pr-4">Student</th>
                   <th className="py-3 pr-4">Student ID</th>
-                  <th className="py-3 pr-4">Score</th>
+                  <th className="py-3 pr-4">Status</th>
                   <th className="py-3 pr-4">Remarks</th>
                   <th className="py-3 pr-4">Action</th>
                 </tr>
@@ -363,15 +356,16 @@ export default function TeacherGradesPage() {
                       </td>
                       <td className="py-4 pr-4 text-sm text-slate-300">{student.studentId}</td>
                       <td className="py-4 pr-4">
-                        <input
-                          type="number"
-                          value={scoreDrafts[student.id] || ""}
-                          onChange={(e) => setScoreDrafts((current) => ({ ...current, [student.id]: e.target.value }))}
-                          className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
-                          placeholder="0"
-                          min={0}
-                          max={100}
-                        />
+                        <select
+                          value={statusDrafts[student.id] || ""}
+                          onChange={(e) => setStatusDrafts((current) => ({ ...current, [student.id]: e.target.value }))}
+                          className="w-36 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+                        >
+                          <option value="">Select</option>
+                          <option value="PRESENT">Present</option>
+                          <option value="ABSENT">Absent</option>
+                          <option value="LATE">Late</option>
+                        </select>
                       </td>
                       <td className="py-4 pr-4">
                         <input
@@ -384,7 +378,7 @@ export default function TeacherGradesPage() {
                       </td>
                       <td className="py-4 pr-4">
                         <button
-                          onClick={() => saveGrade(student.id)}
+                          onClick={() => saveAttendance(student.id)}
                           disabled={savingStudentId === student.id || !selectedSubjectId}
                           className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
                         >

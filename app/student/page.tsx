@@ -135,16 +135,16 @@ export default function StudentPage() {
           </button>
         </div>
 
-        <div className="mb-8 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 p-4">
+          <div className="mb-8 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 p-4">
           <div>
             <p className="text-sm text-slate-400">Need to review your academic records?</p>
-            <p className="text-white font-medium">Grades and report-card view are now available.</p>
+            <p className="text-white font-medium">Attendance and report view are now available.</p>
           </div>
           <button
-            onClick={() => router.push("/student/grades")}
+            onClick={() => router.push("/student/attendance")}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"
           >
-            View Grades
+            View Attendance
           </button>
         </div>
 

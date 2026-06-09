@@ -35,6 +35,7 @@ model Teacher {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduleBlocks  ScheduleBlock[]
   gradeRecords    GradeRecord[]
+  attendanceRecords AttendanceRecord[]
   qualifications  TeacherQualification[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -49,6 +50,7 @@ model Student {
   sectionId       String
   section         Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   gradeRecords    GradeRecord[]
+  attendanceRecords AttendanceRecord[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -60,6 +62,7 @@ model Subject {
   track          String?          // ABM, HUMSS, STEM, etc.
   scheduleBlocks ScheduleBlock[]
   gradeRecords   GradeRecord[]
+  attendanceRecords AttendanceRecord[]
   qualifications TeacherQualification[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -83,6 +86,7 @@ model Section {
   scheduleBlocks ScheduleBlock[]
   students       Student[]
   gradeRecords   GradeRecord[]
+  attendanceRecords AttendanceRecord[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 }
@@ -100,6 +104,33 @@ model GradeRecord {
   gradingPeriod  String   // e.g. Quarter 1, Quarter 2
   academicYear   String   // e.g. 2026-2027
   score          Float
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, subjectId, gradingPeriod, academicYear])
+  @@index([sectionId, subjectId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model AttendanceRecord {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId      String
+  teacher        Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId      String
+  subject        Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sectionId      String
+  section        Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  gradingPeriod  String   // e.g. Quarter 1, Quarter 2
+  academicYear   String   // e.g. 2026-2027
+  status         AttendanceStatus
   remarks        String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

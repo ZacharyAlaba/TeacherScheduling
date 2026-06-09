@@ -34,13 +34,13 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
   return (
     <div className="overflow-x-auto">
       <div className="inline-block min-w-full align-middle">
-        <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-lg shadow-slate-950/40">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 border border-slate-300 bg-slate-800 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-white"
+                  className="sticky left-0 z-10 border border-slate-700 bg-slate-900 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-100"
                 >
                   Time
                 </th>
@@ -48,7 +48,7 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
                   <th
                     key={day}
                     scope="col"
-                    className="min-w-[180px] border border-slate-300 bg-slate-800 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-white"
+                    className="min-w-[180px] border border-slate-700 bg-slate-900 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-100"
                   >
                     {day}
                   </th>
@@ -61,9 +61,9 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
                 return (
                   <tr
                     key={timeSlotKey}
-                    className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                    className={index % 2 === 0 ? "bg-slate-950" : "bg-slate-900"}
                   >
-                    <td className="sticky left-0 z-10 w-[130px] whitespace-nowrap border border-slate-300 bg-slate-100 px-3 py-3 text-xs font-semibold text-slate-800">
+                    <td className="sticky left-0 z-10 w-[130px] whitespace-nowrap border border-slate-700 bg-slate-900 px-3 py-3 text-xs font-semibold text-slate-200">
                       <div className="flex flex-col">
                         <span>{slot.startTime}</span>
                         <span className="text-[10px] font-medium text-slate-500">to</span>
@@ -76,25 +76,25 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
                       return (
                         <td
                           key={`${day}-${timeSlotKey}`}
-                          className="min-h-[88px] min-w-[180px] border border-slate-300 px-2 py-2 align-top"
+                          className="min-h-[88px] min-w-[180px] border border-slate-700 px-2 py-2 align-top"
                         >
                           {item ? (
-                            <div className="h-full rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-                              <div className="mb-1 text-sm font-semibold leading-tight text-slate-900">
+                            <div className="h-full rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-sm shadow-slate-950/20">
+                              <div className="mb-1 text-sm font-semibold leading-tight text-slate-100">
                                 {item.subject}
                               </div>
-                              <div className="text-xs font-medium text-slate-700">
+                              <div className="text-xs font-medium text-slate-300">
                                 {item.section}
                               </div>
                               {item.room && (
-                                <div className="mt-2 inline-block rounded bg-white px-2 py-1 text-[11px] text-slate-600">
+                                <div className="mt-2 inline-block rounded bg-slate-900 px-2 py-1 text-[11px] text-slate-300">
                                   Room {item.room}
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <div className="flex min-h-[72px] items-center justify-center text-xs text-slate-300">
-                              
+                            <div className="flex min-h-[72px] items-center justify-center text-xs text-slate-500">
+                              Free
                             </div>
                           )}
                         </td>

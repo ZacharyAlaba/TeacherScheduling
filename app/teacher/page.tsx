@@ -211,36 +211,36 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-slate-100">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-        <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <header className="rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl shadow-slate-950/10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                 Libertad NHS Senior High
               </p>
-              <h1 className="mt-1 text-3xl font-semibold text-slate-900">Teacher Dashboard</h1>
-              <p className="mt-1 text-slate-600">Welcome, {session?.user?.name || "Teacher"}</p>
+              <h1 className="mt-1 text-3xl font-semibold text-white">Teacher Dashboard</h1>
+              <p className="mt-1 text-slate-300">Welcome, {session?.user?.name || "Teacher"}</p>
               <p className="mt-1 text-xs text-slate-500">
                 Data source: {source === "loading" ? "loading..." : source}
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => router.push("/teacher/grades")}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                onClick={() => router.push("/teacher/attendance")}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
               >
-                Gradebook
+                Attendance
               </button>
               <button
                 onClick={() => setShowPasswordModal(true)}
-                className="rounded-xl bg-slate-600 hover:bg-slate-700 px-4 py-2 text-sm font-semibold text-white transition"
+                className="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-2 text-sm font-semibold text-white transition"
               >
                 Change Password
               </button>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-600"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
               >
                 Logout
               </button>
@@ -249,22 +249,22 @@ export default function TeacherDashboard() {
         </header>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Today</p>
-            <h2 className="mt-2 text-lg font-semibold text-slate-900">{today} Classes</h2>
-            <p className="mt-2 text-3xl font-semibold text-indigo-700">{todayClasses.length}</p>
+          <article className="rounded-2xl border border-slate-700 bg-slate-800 p-5 shadow-xl shadow-slate-950/10">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Today</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">{today} Classes</h2>
+            <p className="mt-2 text-3xl font-semibold text-indigo-300">{todayClasses.length}</p>
           </article>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">This Week</p>
-            <h2 className="mt-2 text-lg font-semibold text-slate-900">Total Class Blocks</h2>
-            <p className="mt-2 text-3xl font-semibold text-indigo-700">{schedule.length}</p>
+          <article className="rounded-2xl border border-slate-700 bg-slate-800 p-5 shadow-xl shadow-slate-950/10">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">This Week</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">Total Class Blocks</h2>
+            <p className="mt-2 text-3xl font-semibold text-indigo-300">{schedule.length}</p>
           </article>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quick Guide</p>
-            <h2 className="mt-2 text-lg font-semibold text-slate-900">How to use</h2>
-            <ul className="mt-2 space-y-1 text-sm text-slate-600">
+          <article className="rounded-2xl border border-slate-700 bg-slate-800 p-5 shadow-xl shadow-slate-950/10">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Quick Guide</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">How to use</h2>
+            <ul className="mt-2 space-y-1 text-sm text-slate-300">
               <li>• Check today’s classes first.</li>
               <li>• Review your weekly timetable below.</li>
               <li>• Report conflicts to admin immediately.</li>
@@ -272,28 +272,28 @@ export default function TeacherDashboard() {
           </article>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Today&apos;s Class Details</h2>
+        <section className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl shadow-slate-950/10">
+          <h2 className="text-xl font-semibold text-white">Today&apos;s Class Details</h2>
           {todayClasses.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-600">No classes scheduled for today.</p>
+            <p className="mt-3 text-sm text-slate-400">No classes scheduled for today.</p>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
+              <table className="min-w-full divide-y divide-slate-700 text-sm">
+                <thead className="bg-slate-800">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Time</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Subject</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Section</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Room</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-300">Time</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-300">Subject</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-300">Section</th>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-300">Room</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
+                <tbody className="divide-y divide-slate-700 bg-slate-950">
                   {todayClasses.map((item) => (
-                    <tr key={`${item.day}-${item.timeSlot}-${item.subject}`}>
-                      <td className="px-4 py-3 text-slate-700">{item.timeSlot}</td>
-                      <td className="px-4 py-3 text-slate-900 font-medium">{item.subject}</td>
-                      <td className="px-4 py-3 text-slate-700">{item.section}</td>
-                      <td className="px-4 py-3 text-slate-700">{item.room || "-"}</td>
+                    <tr key={`${item.day}-${item.timeSlot}-${item.subject}`} className="odd:bg-slate-900 even:bg-slate-950">
+                      <td className="px-4 py-3 text-slate-300">{item.timeSlot}</td>
+                      <td className="px-4 py-3 text-white font-medium">{item.subject}</td>
+                      <td className="px-4 py-3 text-slate-300">{item.section}</td>
+                      <td className="px-4 py-3 text-slate-300">{item.room || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -302,12 +302,12 @@ export default function TeacherDashboard() {
           )}
         </section>
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-xl shadow-slate-950/10">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Weekly Timetable</h2>
+            <h2 className="text-xl font-semibold text-white">Weekly Timetable</h2>
             <button
               onClick={downloadTimetablePdf}
-              className="rounded-xl bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-600"
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
             >
               Download PDF
             </button>
