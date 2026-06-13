@@ -1,0 +1,110 @@
+%% Mermaid ER Diagram for Teacher Scheduling website
+%% Based on Schedule/prisma/schema.prisma
+
+erDiagram
+    USER {
+        String id PK
+        String email
+        String password
+        String name
+        Role role
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    TEACHER {
+        String id PK
+        String userId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    STUDENT {
+        String id PK
+        String userId FK
+        String studentId
+        String gradeLevel
+        String sectionId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    SUBJECT {
+        String id PK
+        String name
+        String gradeLevel
+        String track
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    TIMESLOT {
+        String id PK
+        String day
+        String startTime
+        String endTime
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    SECTION {
+        String id PK
+        String name
+        String gradeLevel
+        String track
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    ATTENDANCERECORD {
+        String id PK
+        String studentId FK
+        String teacherId FK
+        String subjectId FK
+        String sectionId FK
+        String gradingPeriod
+        String academicYear
+        AttendanceStatus status
+        String remarks
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    SCHEDULEBLOCK {
+        String id PK
+        String teacherId FK
+        String subjectId FK
+        String timeSlotId FK
+        String sectionId FK
+        String room
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    TEACHERQUALIFICATION {
+        String id PK
+        String teacherId FK
+        String subjectId FK
+        String position
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    USER ||--o{ TEACHER : "owns"
+    USER ||--o{ STUDENT : "owns"
+
+    TEACHER ||--o{ SCHEDULEBLOCK : "teaches"
+    TEACHER ||--o{ ATTENDANCERECORD : "records"
+    TEACHER ||--o{ TEACHERQUALIFICATION : "has"
+
+    STUDENT ||--o{ ATTENDANCERECORD : "receives"
+
+    SECTION ||--o{ STUDENT : "contains"
+    SECTION ||--o{ SCHEDULEBLOCK : "uses"
+    SECTION ||--o{ ATTENDANCERECORD : "groups"
+
+    SUBJECT ||--o{ SCHEDULEBLOCK : "is taught in"
+    SUBJECT ||--o{ ATTENDANCERECORD : "is tracked in"
+    SUBJECT ||--o{ TEACHERQUALIFICATION : "is qualified for"
+
+    TIMESLOT ||--o{ SCHEDULEBLOCK : "schedules"

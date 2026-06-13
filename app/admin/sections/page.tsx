@@ -157,6 +157,7 @@ export default function SectionsPage() {
                   <option value="ABM">ABM</option>
                   <option value="HUMSS">HUMSS</option>
                   <option value="STEM">STEM</option>
+                  <option value="GAS">GAS</option>
                 </select>
               </div>
               <button
