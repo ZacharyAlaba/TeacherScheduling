@@ -5,6 +5,21 @@ import { prisma } from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
 
+const daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+function normalizeTimeSlot(slot: { day: string; startTime: string; endTime: string }) {
+  return `${slot.day}:${slot.startTime}:${slot.endTime}`;
+}
+
+function sortTimeSlots(slots: Array<{ day: string; startTime: string }>) {
+  return slots.sort((a, b) => {
+    const dayA = daysOrder.indexOf(a.day);
+    const dayB = daysOrder.indexOf(b.day);
+    if (dayA !== dayB) return dayA - dayB;
+    return Number(a.startTime.replace(":", "")) - Number(b.startTime.replace(":", ""));
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,8 +38,23 @@ export async function GET(request: NextRequest) {
       orderBy: [{ day: "asc" }, { startTime: "asc" }],
     });
 
+    let csvTimeSlots = [];
+    try {
+      csvTimeSlots = await loadTimeSlotsFromCsv();
+    } catch (csvErr) {
+      console.error("Failed to load time slots from CSV:", csvErr?.message || csvErr);
+    }
+
     if (timeSlots.length === 0) {
-      timeSlots = await loadTimeSlotsFromCsv();
+      timeSlots = csvTimeSlots;
+    } else if (csvTimeSlots.length > 0) {
+      const existingKeys = new Set(timeSlots.map(normalizeTimeSlot));
+      csvTimeSlots.forEach((slot) => {
+        if (!existingKeys.has(normalizeTimeSlot(slot))) {
+          timeSlots.push(slot);
+        }
+      });
+      timeSlots = sortTimeSlots(timeSlots);
     }
 
     return NextResponse.json(timeSlots);

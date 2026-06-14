@@ -5,13 +5,43 @@ import { prisma } from "@/lib/prisma";
 import fs from "fs/promises";
 import path from "path";
 
+function normalizeSectionKey(section: { name: string; gradeLevel: string; track: string }) {
+  const name = (section.name || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const grade = (section.gradeLevel || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const track = (section.track || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return `${grade}:${track}:${name}`;
+}
+
+async function loadSectionsFromCsv() {
+  const csvPath = path.resolve(process.cwd(), "..", "data", "sections.csv");
+  const txt = await fs.readFile(csvPath, "utf8");
+  const lines = txt.split(/\r?\n/).filter((l) => l.trim() !== "");
+  if (lines.length <= 1) return [];
+  const headers = lines[0].split(",").map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const obj: any = {};
+    headers.forEach((h, i) => (obj[h] = cols[i] ?? ""));
+    return {
+      id: null,
+      name: obj.name || obj.section || obj[headers[0]] || "",
+      gradeLevel: obj.grade_level || obj.gradeLevel || obj.grade || "",
+      track: obj.track || "",
+      createdAt: null,
+    };
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     let session = null;
     try {
       session = await getServerSession(authOptions);
-    } catch (err) {
-      console.error('getServerSession error in sections route:', err?.message || err);
+    } catch (err: unknown) {
+      console.error(
+        "getServerSession error in sections route:",
+        err instanceof Error ? err.message : JSON.stringify(err)
+      );
       session = null;
     }
 
@@ -23,41 +53,35 @@ export async function GET(request: NextRequest) {
       }
       // continue in demo mode to read CSV fallback
     }
-    let sections = [];
+    let sections: Array<{ id: string | null; name: string; gradeLevel: string; track: string; createdAt: Date | null }> = [];
+    let csvSections: Array<{ id: string | null; name: string; gradeLevel: string; track: string; createdAt: Date | null }> = [];
 
     try {
       sections = await prisma.section.findMany({ orderBy: { createdAt: "desc" } });
-    } catch (dbErr) {
-      console.error("Prisma error fetching sections, falling back to CSV:", dbErr?.message || dbErr);
+    } catch (dbErr: unknown) {
+      console.error(
+        "Prisma error fetching sections, falling back to CSV:",
+        dbErr instanceof Error ? dbErr.message : JSON.stringify(dbErr)
+      );
       sections = [];
     }
 
-    // If no sections in DB, try to read from data/sections.csv to show recorded data without a DB configured
+    try {
+      csvSections = await loadSectionsFromCsv();
+      const existingKeys = new Set(sections.map(normalizeSectionKey));
+      sections = sections.concat(
+        csvSections.filter((csv) => !existingKeys.has(normalizeSectionKey(csv)))
+      );
+    } catch (csvErr: unknown) {
+      console.error(
+        "Failed to load sections from CSV:",
+        csvErr instanceof Error ? csvErr.message : JSON.stringify(csvErr)
+      );
+    }
+
+    // If no sections in DB or merged sections are still empty, use CSV fallback
     if (!sections || sections.length === 0) {
-      try {
-        const csvPath = path.resolve(process.cwd(), "..", "data", "sections.csv");
-        const txt = await fs.readFile(csvPath, "utf8");
-        const lines = txt.split(/\r?\n/).filter((l) => l.trim() !== "");
-        if (lines.length > 1) {
-          const headers = lines[0].split(",").map((h) => h.trim());
-          const rows = lines.slice(1).map((line) => {
-            const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-            const obj: any = {};
-            headers.forEach((h, i) => (obj[h] = cols[i] ?? ""));
-            // Map CSV columns to Section fields (name, gradeLevel, track)
-            return {
-              id: null,
-              name: obj.name || obj.section || obj[headers[0]] || "",
-              gradeLevel: obj.grade_level || obj.gradeLevel || obj.grade || "",
-              track: obj.track || "",
-              createdAt: null,
-            };
-          });
-          return NextResponse.json(rows);
-        }
-      } catch (csvErr) {
-        console.error("Failed to read sections.csv fallback:", csvErr?.message || csvErr);
-      }
+      return NextResponse.json(csvSections);
     }
 
     return NextResponse.json(sections);

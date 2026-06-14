@@ -1,5 +1,7 @@
 "use client";
 
+import { findImagePrefillEntries } from "@/lib/imagePrefill";
+
 interface TimeSlot {
   startTime: string;
   endTime: string;
@@ -24,6 +26,55 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
   const uniqueTimeSlots = Array.from(
     new Map(timeSlots.map((slot) => [`${slot.startTime}-${slot.endTime}`, slot])).values()
   );
+
+  function parseToMinutes(value: string) {
+    if (!value) return 0;
+    const normalized = value.trim().toUpperCase();
+    const ampmMatch = normalized.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/);
+    if (ampmMatch) {
+      let hour = Number(ampmMatch[1]) % 12;
+      const minute = Number(ampmMatch[2]);
+      if (ampmMatch[3] === "PM") hour += 12;
+      return hour * 60 + minute;
+    }
+    const hhmm = normalized.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      return Number(hhmm[1]) * 60 + Number(hhmm[2]);
+    }
+    return 0;
+  }
+
+  // ensure there's a 17:00-18:00 slot (5:00-6:00) at the end if missing
+  const slots = [...uniqueTimeSlots];
+  slots.sort((a, b) => parseToMinutes(a.startTime) - parseToMinutes(b.startTime));
+  const hasFiveToSixSlot = slots.some((slot) => parseToMinutes(slot.startTime) === 17 * 60);
+  if (!hasFiveToSixSlot) {
+    slots.push({ startTime: "17:00", endTime: "18:00" });
+    slots.sort((a, b) => parseToMinutes(a.startTime) - parseToMinutes(b.startTime));
+  }
+
+  function formatDisplayTime(value: string) {
+    if (!value) return "";
+    const normalized = value.trim();
+    // already contains AM/PM
+    if (/AM|PM/i.test(normalized)) {
+      const m = normalized.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+      if (!m) return normalized;
+      const hour = Number(m[1]) % 12 || 12;
+      const minute = m[2];
+      return `${hour}:${minute}`;
+    }
+    // if 24h hh:mm
+    const hhmm = normalized.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      let hour = Number(hhmm[1]);
+      const minute = hhmm[2];
+      // convert to 12-hour without AM/PM
+      hour = hour % 12 || 12;
+      return `${hour}:${minute}`;
+    }
+    return normalized;
+  }
 
   const getScheduleItem = (day: string, timeSlot: string) => {
     return schedule.find(
@@ -56,47 +107,72 @@ export default function Timetable({ schedule, timeSlots }: TimetableProps) {
               </tr>
             </thead>
             <tbody>
-              {uniqueTimeSlots.map((slot, index) => {
+              {slots.map((slot, index) => {
                 const timeSlotKey = `${slot.startTime}-${slot.endTime}`;
                 return (
                   <tr
                     key={timeSlotKey}
                     className={index % 2 === 0 ? "bg-slate-950" : "bg-slate-900"}
                   >
-                    <td className="sticky left-0 z-10 w-[130px] whitespace-nowrap border border-slate-700 bg-slate-900 px-3 py-3 text-xs font-semibold text-slate-200">
+                      <td className="sticky left-0 z-10 w-[130px] whitespace-nowrap border border-slate-700 bg-slate-900 px-3 py-3 text-xs font-semibold text-slate-200">
                       <div className="flex flex-col">
-                        <span>{slot.startTime}</span>
+                        <span>{formatDisplayTime(slot.startTime)}</span>
                         <span className="text-[10px] font-medium text-slate-500">to</span>
-                        <span>{slot.endTime}</span>
+                        <span>{formatDisplayTime(slot.endTime)}</span>
                       </div>
                     </td>
 
-                    {DAYS.map((day) => {
+                      {DAYS.map((day) => {
                       const item = getScheduleItem(day, timeSlotKey);
                       return (
                         <td
                           key={`${day}-${timeSlotKey}`}
                           className="min-h-[88px] min-w-[180px] border border-slate-700 px-2 py-2 align-top"
                         >
-                          {item ? (
-                            <div className="h-full rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-sm shadow-slate-950/20">
-                              <div className="mb-1 text-sm font-semibold leading-tight text-slate-100">
-                                {item.subject}
-                              </div>
-                              <div className="text-xs font-medium text-slate-300">
-                                {item.section}
-                              </div>
-                              {item.room && (
-                                <div className="mt-2 inline-block rounded bg-slate-900 px-2 py-1 text-[11px] text-slate-300">
-                                  Room {item.room}
+                              {item ? (
+                                // determine if this item is a break or has a prefills style
+                                (() => {
+                                  const isBreak = item.subject?.toUpperCase().includes("RECESS") || item.subject?.toUpperCase().includes("LUNCH");
+                                  // try to find a matching prefill entry for styling
+                                  const prefillList = findImagePrefillEntries(item.section || "") || [];
+                                  const slotStart = slot.startTime;
+                                  const matchedPrefill = prefillList.find((p) => p.day === item.day && p.startTime === slotStart);
+
+                                  const tileBg = matchedPrefill?.bg || (isBreak ? "bg-rose-300" : "bg-slate-800");
+                                  const tileText = matchedPrefill?.textColor || (isBreak ? "text-black" : "text-slate-100");
+
+                                  // non-clickable for breaks
+                                  if (isBreak) {
+                                    return (
+                                      <div className={`w-full h-full rounded-xl ${tileBg} ${tileText} p-3 flex flex-col justify-center items-center text-sm font-semibold leading-tight cursor-default`}>
+                                        <div>{item.subject}</div>
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div className={`h-full rounded-xl border border-slate-700 ${tileBg} p-3 shadow-sm shadow-slate-950/20 flex flex-col justify-between`}> 
+                                      <div>
+                                        <div className={`mb-1 text-sm font-semibold leading-tight ${tileText}`}>
+                                          {item.subject}
+                                        </div>
+                                        <div className="text-xs font-medium text-slate-300">
+                                          {item.section}
+                                        </div>
+                                        {item.room && (
+                                          <div className="mt-2 inline-block rounded bg-slate-900 px-2 py-1 text-[11px] text-slate-300">
+                                            Room {item.room}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="flex min-h-[72px] items-center justify-center text-xs text-slate-500">
+                                  Free
                                 </div>
                               )}
-                            </div>
-                          ) : (
-                            <div className="flex min-h-[72px] items-center justify-center text-xs text-slate-500">
-                              Free
-                            </div>
-                          )}
                         </td>
                       );
                     })}

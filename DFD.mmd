@@ -1,0 +1,93 @@
+%% Mermaid Data Flow Diagram for Teacher Scheduling System
+%% Save this file in the Schedule folder and render with a Mermaid viewer.
+flowchart LR
+  subgraph External[External Entities]
+    Admin[Admin]
+    Teacher[Teacher]
+    Student[Student]
+  end
+
+  subgraph App[Web Application / Browser]
+    UI[User Interface]
+    Auth[Authentication / NextAuth]
+    AdminUI[Admin Dashboard]
+    TeacherUI[Teacher Dashboard]
+    StudentUI[Student Dashboard]
+  end
+
+  subgraph API[Server API / Next.js App Router]
+    AdminAPI[/api/admin/*]
+    TeacherAPI[/api/teacher/*]
+    StudentAPI[/api/student/*]
+    AuthAPI[/api/auth/*]
+  end
+
+  subgraph Data[Database / Prisma / PostgreSQL]
+    Users[(Users)]
+    Teachers[(Teachers)]
+    Students[(Students)]
+    Subjects[(Subjects)]
+    Sections[(Sections)]
+    TimeSlots[(TimeSlots)]
+    ScheduleBlocks[(ScheduleBlocks)]
+    GradeRecords[(GradeRecords)]
+    AttendanceRecords[(AttendanceRecords)]
+    TeacherQualifications[(TeacherQualifications)]
+  end
+
+  Admin -->|Login / manage system| Auth
+  Teacher -->|Login / view schedule| Auth
+  Student -->|Login / view grades/schedule| Auth
+
+  Auth -->|Session token / role| UI
+  UI -->|Navigates to portal| AdminUI
+  UI -->|Navigates to portal| TeacherUI
+  UI -->|Navigates to portal| StudentUI
+
+  AdminUI -->|Fetch / update metadata| AdminAPI
+  TeacherUI -->|Fetch schedule / submit attendance| TeacherAPI
+  StudentUI -->|Fetch grade sheet / schedule| StudentAPI
+  UI -->|Authenticate / sign in| AuthAPI
+
+  AdminAPI -->|Validate session / role| Auth
+  TeacherAPI -->|Validate session / role| Auth
+  StudentAPI -->|Validate session / role| Auth
+
+  AdminAPI -->|Read/write users| Users
+  AdminAPI -->|Read teachers| Teachers
+  AdminAPI -->|Read students| Students
+  AdminAPI -->|Read/write subjects| Subjects
+  AdminAPI -->|Read/write sections| Sections
+  AdminAPI -->|Read/write time slots| TimeSlots
+  AdminAPI -->|Read/write schedule blocks| ScheduleBlocks
+  AdminAPI -->|Read qualifications| TeacherQualifications
+  AdminAPI -->|Read conflicts / workloads| ScheduleBlocks
+
+  TeacherAPI -->|Read teacher schedule| ScheduleBlocks
+  TeacherAPI -->|Read time slots| TimeSlots
+  TeacherAPI -->|Read subjects / sections| Subjects
+  TeacherAPI -->|Read teacher qualifications| TeacherQualifications
+  TeacherAPI -->|Read/write attendance| AttendanceRecords
+  TeacherAPI -->|Read/write grades| GradeRecords
+
+  StudentAPI -->|Read student records| Students
+  StudentAPI -->|Read schedule / grades| ScheduleBlocks
+  StudentAPI -->|Read grades| GradeRecords
+
+  AuthAPI -->|Read users for login| Users
+  AuthAPI -->|Read students for student login| Students
+
+  Teachers -->|Profile relations| Users
+  Students -->|Profile relations| Users
+  GradeRecords -->|Link student/teacher/subject/section| Students
+  GradeRecords -->|Link student/teacher/subject/section| Teachers
+  GradeRecords -->|Link student/teacher/subject/section| Subjects
+  GradeRecords -->|Link student/teacher/subject/section| Sections
+  AttendanceRecords -->|Link student/teacher/subject/section| Students
+  AttendanceRecords -->|Link student/teacher/subject/section| Teachers
+  AttendanceRecords -->|Link student/teacher/subject/section| Subjects
+  AttendanceRecords -->|Link student/teacher/subject/section| Sections
+  ScheduleBlocks -->|Link teacher/subject/section/time slot| Teachers
+  ScheduleBlocks -->|Link teacher/subject/section/time slot| Subjects
+  ScheduleBlocks -->|Link teacher/subject/section/time slot| Sections
+  ScheduleBlocks -->|Link teacher/subject/section/time slot| TimeSlots

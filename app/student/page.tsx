@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Timetable from "@/components/Timetable";
 
 interface Subject {
   id: string;
@@ -54,6 +55,7 @@ export default function StudentPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [studentData, setStudentData] = useState<StudentData | null>(null);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function StudentPage() {
       if (response.ok) {
         const data = await response.json();
         setStudentData(data);
+        setTimeSlots(data.timeSlots ?? []);
       }
     } catch (error) {
       console.error("Failed to fetch student data:", error);
@@ -83,6 +86,26 @@ export default function StudentPage() {
   }
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+  function formatDisplayTime(value: string) {
+    if (!value) return "";
+    const normalized = value.trim();
+    if (/AM|PM/i.test(normalized)) {
+      const m = normalized.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+      if (!m) return normalized;
+      const hour = Number(m[1]) % 12 || 12;
+      const minute = m[2];
+      return `${hour}:${minute}`;
+    }
+    const hhmm = normalized.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      let hour = Number(hhmm[1]);
+      const minute = hhmm[2];
+      hour = hour % 12 || 12;
+      return `${hour}:${minute}`;
+    }
+    return normalized;
+  }
 
   const getDaySchedule = (day: string) => {
     if (!studentData) return [];
@@ -176,40 +199,17 @@ export default function StudentPage() {
             <h2 className="text-2xl font-bold text-white">Weekly Schedule</h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <div className="grid grid-cols-5 gap-0 min-w-max">
-              {days.map((day) => (
-                <div key={day} className="flex-1 min-w-[300px] border-r border-slate-700 last:border-r-0">
-                  <div className="bg-slate-700 p-4 border-b border-slate-600">
-                    <h3 className="font-semibold text-white text-lg">{day}</h3>
-                  </div>
-
-                  <div className="p-4 space-y-3 min-h-[400px]">
-                    {getDaySchedule(day).length === 0 ? (
-                      <p className="text-slate-400 text-sm">No classes</p>
-                    ) : (
-                      getDaySchedule(day).map((block) => (
-                        <div
-                          key={block.id}
-                          className="p-3 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg border border-blue-700 hover:border-blue-600 transition"
-                        >
-                          <p className="font-semibold text-white text-sm">{block.subject.name}</p>
-                          <p className="text-blue-200 text-xs mt-1">
-                            {block.timeSlot.startTime} - {block.timeSlot.endTime}
-                          </p>
-                          <p className="text-blue-300 text-xs mt-2">
-                            Teacher: {block.teacher.user.name}
-                          </p>
-                          {block.room && (
-                            <p className="text-blue-300 text-xs">Room: {block.room}</p>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="p-6">
+            <Timetable
+              schedule={(studentData?.schedule ?? []).map((block) => ({
+                day: block.timeSlot.day,
+                timeSlot: `${block.timeSlot.startTime}-${block.timeSlot.endTime}`,
+                subject: block.subject.name,
+                section: studentData?.section?.name || "",
+                room: block.room || null,
+              }))}
+              timeSlots={(timeSlots.length > 0 ? timeSlots : (studentData?.schedule ?? []).map(s => ({ startTime: s.timeSlot.startTime, endTime: s.timeSlot.endTime }))).map(ts => ({ startTime: ts.startTime, endTime: ts.endTime }))}
+            />
           </div>
         </div>
 
@@ -243,7 +243,7 @@ export default function StudentPage() {
                       <td className="px-6 py-4 text-sm text-white font-medium">{block.subject.name}</td>
                       <td className="px-6 py-4 text-sm text-slate-300">{block.timeSlot.day}</td>
                       <td className="px-6 py-4 text-sm text-slate-300">
-                        {block.timeSlot.startTime} - {block.timeSlot.endTime}
+                        {formatDisplayTime(block.timeSlot.startTime)} - {formatDisplayTime(block.timeSlot.endTime)}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-300">{block.teacher.user.name}</td>
                       <td className="px-6 py-4 text-sm text-slate-300">{block.room || "-"}</td>

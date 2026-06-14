@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react"
+import { signOut } from "next-auth/react";
 
 interface Teacher {
   id: string;
@@ -17,11 +17,19 @@ export default function TeachersPage() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [signupLinkCopied, setSignupLinkCopied] = useState(false);
-
-  const signupUrl = typeof window !== 'undefined' ? `${window.location.origin}/signup` : '/signup';
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportResult, setBulkImportResult] = useState<any>(null);
+  const [signupUrl, setSignupUrl] = useState("/signup");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSignupUrl(`${window.location.origin}/signup`);
+    }
     fetchTeachers();
   }, []);
 
@@ -38,25 +46,37 @@ export default function TeachersPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!editingId) return; // Only allow editing, not creating
-    
+
     try {
+      const method = editingId ? "PUT" : "POST";
+      const body = editingId ? { ...formData, id: editingId } : formData;
       const response = await fetch("/api/admin/teachers", {
-        method: "PUT",
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, id: editingId }),
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
+        const result = await response.json();
         setFormData({ name: "", email: "" });
         setEditingId(null);
         setShowForm(false);
+        setSuccessMessage(
+          editingId
+            ? "Teacher updated successfully."
+            : `Teacher created successfully. Temporary password: ${result.password}`
+        );
         await fetchTeachers();
+        window.setTimeout(() => setSuccessMessage(null), 8000);
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || error.message || "Unable to save teacher."}`);
       }
     } catch (error) {
-      console.error("Failed to update teacher:", error);
+      console.error("Failed to save teacher:", error);
+      alert("Failed to save teacher");
     }
   }
 
@@ -80,11 +100,53 @@ export default function TeachersPage() {
     }
   }
 
+  async function handleBulkImport(e: FormEvent) {
+    e.preventDefault();
+
+    if (!bulkImportFile) {
+      alert("Please select a CSV file");
+      return;
+    }
+
+    setBulkImporting(true);
+    setBulkImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", bulkImportFile);
+
+      const response = await fetch("/api/admin/teachers/bulk-import", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        setBulkImportResult(result);
+        setBulkImportFile(null);
+        setShowBulkImport(false);
+        await fetchTeachers();
+      } else {
+        alert(`Error: ${result.error || "Failed to import teachers."}`);
+      }
+    } catch (error) {
+      console.error("Failed to import teachers:", error);
+      alert("Failed to import teachers");
+    } finally {
+      setBulkImporting(false);
+    }
+  }
+
   function handleEdit(teacher: Teacher) {
     setFormData({ name: teacher.user.name, email: teacher.user.email });
     setEditingId(teacher.id);
     setShowForm(true);
   }
+
+  const filteredTeachers = teachers.filter((teacher) =>
+    teacher.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    teacher.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
@@ -116,7 +178,7 @@ export default function TeachersPage() {
             <div className="flex-1">
               <h3 className="text-lg font-bold text-white mb-2">How to Add Teachers</h3>
               <p className="text-slate-300 mb-4">
-                Teachers should register themselves using the signup page. Once they sign up, they will automatically appear in this list and you can assign them to classes.
+                Teachers can either sign up through the signup page or be added directly from this admin panel. If you create them here, a temporary password will be generated for them.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <div className="flex-1 bg-slate-900/50 rounded-lg px-4 py-3 border border-slate-700 font-mono text-sm text-slate-300 break-all">
@@ -136,10 +198,17 @@ export default function TeachersPage() {
           </div>
         </div>
 
-        {/* Edit Form (only shows when editing) */}
-        {showForm && editingId && (
+        {/* Add / Edit Teacher Form */}
+        {showForm && (
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-8">
-            <h3 className="text-lg font-bold text-white mb-4">Edit Teacher</h3>
+            <h3 className="text-lg font-bold text-white mb-4">
+              {editingId ? "Edit Teacher" : "Add Teacher"}
+            </h3>
+            {successMessage && (
+              <div className="mb-4 rounded-lg border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                {successMessage}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-300 mb-2">Name</label>
@@ -168,6 +237,7 @@ export default function TeachersPage() {
                     setShowForm(false);
                     setEditingId(null);
                     setFormData({ name: "", email: "" });
+                    setSuccessMessage(null);
                   }}
                   className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold"
                 >
@@ -177,19 +247,142 @@ export default function TeachersPage() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold"
                 >
-                  Update Teacher
+                  {editingId ? "Update Teacher" : "Create Teacher"}
                 </button>
               </div>
             </form>
           </div>
         )}
 
+        {/* Search and Add Teacher Controls */}
+        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-2/3 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFormData({ name: "", email: "" });
+                setEditingId(null);
+                setSuccessMessage(null);
+                setShowForm(true);
+              }}
+              className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
+            >
+              Add Teacher
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBulkImport((current) => !current);
+                setBulkImportResult(null);
+                setBulkImportFile(null);
+              }}
+              className="px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold"
+            >
+              {showBulkImport ? "Cancel" : "Bulk Import"}
+            </button>
+          </div>
+        </div>
+        {showBulkImport && (
+          <div className="mb-8 p-6 bg-slate-800 rounded-lg border border-slate-700">
+            <h2 className="text-2xl font-bold text-white mb-4">Bulk Import Teachers</h2>
+            <p className="text-slate-400 mb-6">
+              Upload a CSV file with columns: name, email
+            </p>
+
+            <form onSubmit={handleBulkImport} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">CSV File *</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setBulkImportFile(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 file:bg-blue-600 file:text-white file:px-4 file:py-2 file:rounded file:border-0 file:cursor-pointer file:mr-4"
+                  required
+                />
+              </div>
+
+              <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                <p className="text-sm text-slate-300 mb-3">CSV Format Example:</p>
+                <pre className="text-xs text-slate-400 overflow-x-auto">
+name,email
+John Doe,john@school.edu
+Jane Smith,jane@school.edu
+                </pre>
+              </div>
+
+              <button
+                type="submit"
+                disabled={bulkImporting}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50"
+              >
+                {bulkImporting ? "Importing..." : "Import Teachers"}
+              </button>
+            </form>
+
+            {bulkImportResult && (
+              <div className="mt-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
+                    <p className="text-green-300 text-sm font-medium">Successfully Added</p>
+                    <p className="text-2xl font-bold text-green-400">{bulkImportResult.success}</p>
+                  </div>
+                  {bulkImportResult.failed > 0 && (
+                    <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                      <p className="text-red-300 text-sm font-medium">Failed</p>
+                      <p className="text-2xl font-bold text-red-400">{bulkImportResult.failed}</p>
+                    </div>
+                  )}
+                </div>
+
+                {bulkImportResult.created?.length > 0 && (
+                  <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                    <p className="text-white font-semibold mb-3">Successfully Created Teachers:</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {bulkImportResult.created.map((teacher: any, idx: number) => (
+                        <div key={idx} className="text-sm text-slate-300 p-2 bg-slate-800 rounded flex justify-between items-center">
+                          <span>{teacher.name}</span>
+                          <span className="font-mono text-green-400 font-medium">{teacher.email}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {bulkImportResult.errors?.length > 0 && (
+                  <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/30">
+                    <p className="text-red-300 font-semibold mb-3">Import Errors:</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {bulkImportResult.errors.map((error: any, idx: number) => (
+                        <div key={idx} className="text-sm text-red-300 p-2 bg-red-900/20 rounded">
+                          <p className="font-medium">Row {error.row}: {error.name}</p>
+                          <p className="text-red-400 text-xs">{error.error}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {successMessage && !showForm && (
+          <div className="mb-6 rounded-lg border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {successMessage}
+          </div>
+        )}
         {/* Teachers Table */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-          {!loading && teachers.length > 0 && (
+          {!loading && filteredTeachers.length >= 0 && (
             <div className="px-6 py-4 border-b border-slate-700 bg-slate-900">
               <h3 className="text-lg font-bold text-white">
-                Registered Teachers <span className="text-slate-400 font-normal">({teachers.length})</span>
+                Registered Teachers <span className="text-slate-400 font-normal">({filteredTeachers.length})</span>
               </h3>
             </div>
           )}
@@ -217,7 +410,7 @@ export default function TeachersPage() {
                 </tr>
               </thead>
               <tbody>
-                {teachers.map((teacher) => (
+                {filteredTeachers.map((teacher) => (
                   <tr key={teacher.id} className="border-b border-slate-700 hover:bg-slate-700/50">
                     <td className="px-6 py-3 text-white">{teacher.user.name}</td>
                     <td className="px-6 py-3 text-slate-400">{teacher.user.email}</td>

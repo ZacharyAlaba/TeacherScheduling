@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { findImagePrefillEntries } from "@/lib/imagePrefill";
+import { normalizeSubjectName } from "@/lib/normalizeSubjectName";
 
 type ScheduleItem = {
   day: string;
@@ -67,6 +69,8 @@ const demoTimeSlots: TimeSlotItem[] = [
   { startTime: "04:30 PM", endTime: "05:30 PM" },
 ];
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
 function formatTimeForDisplay(value: string) {
   const normalized = value.trim();
   if (/am|pm/i.test(normalized)) {
@@ -82,7 +86,8 @@ function formatTimeForDisplay(value: string) {
   const minute = match[2];
   const suffix = hour24 >= 12 ? "PM" : "AM";
   const hour12 = hour24 % 12 || 12;
-  return `${String(hour12).padStart(2, "0")}:${minute} ${suffix}`;
+  // display without leading zero ("1:00 PM" instead of "01:00 PM")
+  return `${hour12}:${minute} ${suffix}`;
 }
 
 function timeToMinutes(value: string) {
@@ -198,6 +203,8 @@ const sectionSlotTimes: { startTime: string; endTime: string }[] = [
   { startTime: "13:00", endTime: "14:00" },
   { startTime: "14:00", endTime: "15:00" },
   { startTime: "15:00", endTime: "16:00" },
+  { startTime: "16:00", endTime: "17:00" },
+  { startTime: "17:00", endTime: "18:00" },
 ];
 
 const sectionDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -612,13 +619,40 @@ async function buildFallbackStudentSchedule(student: { section: { name: string; 
   const allTimeSlots = await prisma.timeSlot.findMany();
   const subjects = await prisma.subject.findMany({ where: { gradeLevel: "G11" } });
   const subjectMap = new Map(subjects.map((subject) => [subject.name, subject]));
-  const templates = getFallbackTemplates(student.section.track, student.section.name);
+  // Prefer image-prefill templates if available for this section
+  const imageEntries = findImagePrefillEntries(student.section.name);
+  let templates = [] as FallbackTemplate[];
+  if (imageEntries && imageEntries.length > 0) {
+    templates = imageEntries.map((e) => {
+      const slot = sectionSlotTimes.find((s) => s.startTime === e.startTime) || sectionSlotTimes[0];
+      return {
+        day: e.day,
+        startTime: e.startTime,
+        endTime: slot.endTime,
+        subject: e.label,
+        room: subjectRoomMap[e.label] || "SHS-201",
+        teacherName: `Ms. ${student.section.name.split(/[-\s]+/)[0] || "Teacher"}`,
+        teacherEmail: `${student.section.name.split(/[-\s]+/)[0].toLowerCase()}@school.edu`,
+      };
+    });
+  } else {
+    templates = getFallbackTemplates(student.section.track, student.section.name);
+  }
+  // Inject fixed break templates (RECESS and LUNCH) for Mon-Fri so students see them
+  const breakTemplates: FallbackTemplate[] = sectionDays.flatMap((day) => [
+    { day, startTime: "09:45", endTime: "10:00", subject: "RECESS", room: null as any, teacherName: "", teacherEmail: "" },
+    { day, startTime: "12:00", endTime: "13:00", subject: "LUNCH BREAK", room: null as any, teacherName: "", teacherEmail: "" },
+  ]);
+
+  // Merge and keep original templates first
+  templates = [...templates, ...breakTemplates];
 
   return templates.map((template, index) => {
     const timeSlot = findTimeSlot(allTimeSlots, template.day, template.startTime, template.endTime);
-    const subject = subjectMap.get(template.subject) ?? {
-      id: `fallback-${template.subject}`,
-      name: template.subject,
+    const normalizedSubject = normalizeSubjectName(template.subject);
+    const subject = subjectMap.get(normalizedSubject) ?? {
+      id: `fallback-${normalizedSubject}`,
+      name: normalizedSubject,
       gradeLevel: "G11",
       track: student.section.track,
     };
@@ -714,7 +748,11 @@ export async function GET() {
         ],
       });
 
-      if (schedule.length === 0 && student.gradeLevel === "G11") {
+      // also include canonical time slots so clients can render a full grid
+      const allTimeSlots = await prisma.timeSlot.findMany({ orderBy: [{ day: "asc" }, { startTime: "asc" }] });
+
+      const isPrefillSection = student.gradeLevel === "G11" && findImagePrefillEntries(student.section.name).length > 0;
+      if (schedule.length === 0 || isPrefillSection) {
         schedule = await buildFallbackStudentSchedule(student);
       }
 
@@ -725,6 +763,7 @@ export async function GET() {
         gradeLevel: student.gradeLevel,
         section: student.section,
         schedule,
+        timeSlots: allTimeSlots,
       });
     }
 
@@ -744,7 +783,7 @@ export async function GET() {
 
     const allTimeSlots = await prisma.timeSlot.findMany();
 
-    const schedule: ScheduleItem[] =
+    const baseSchedule: ScheduleItem[] =
       teacher?.scheduleBlocks.map((block) => ({
         day: block.timeSlot.day,
         timeSlot: `${formatTimeForDisplay(block.timeSlot.startTime)}-${formatTimeForDisplay(block.timeSlot.endTime)}`,
@@ -752,6 +791,27 @@ export async function GET() {
         section: block.section.name,
         room: block.room,
       })) ?? [];
+
+    const scheduleBreaks: ScheduleItem[] = [
+      ...DAYS.flatMap((day) => [
+        {
+          day,
+          timeSlot: `${formatTimeForDisplay("09:45")}-${formatTimeForDisplay("10:00")}`,
+          subject: "RECESS",
+          section: "",
+          room: null,
+        },
+        {
+          day,
+          timeSlot: `${formatTimeForDisplay("12:00")}-${formatTimeForDisplay("13:00")}`,
+          subject: "LUNCH BREAK",
+          section: "",
+          room: null,
+        },
+      ]),
+    ];
+
+    const schedule: ScheduleItem[] = [...baseSchedule, ...scheduleBreaks];
 
     const sourceTimeSlots =
       allTimeSlots.length > 0
@@ -764,8 +824,15 @@ export async function GET() {
             endTime: block.timeSlot.endTime,
           })) ?? [];
 
+    const breakSlots: TimeSlotItem[] = [
+      { startTime: "09:45", endTime: "10:00" },
+      { startTime: "12:00", endTime: "13:00" },
+    ];
+
+    const allSourceSlots = [...sourceTimeSlots, ...breakSlots];
+
     const uniqueSlots = new Map<string, TimeSlotItem>();
-    for (const slot of sourceTimeSlots) {
+    for (const slot of allSourceSlots) {
       const key = `${slot.startTime}-${slot.endTime}`;
       if (!uniqueSlots.has(key)) {
         uniqueSlots.set(key, {

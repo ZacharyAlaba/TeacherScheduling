@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Update schedule UI",
+			"type": "shell",
+			"command": "echo 'updating schedule UI'",
+			"args": [],
+			"isBackground": false
+		}
+	]
+}

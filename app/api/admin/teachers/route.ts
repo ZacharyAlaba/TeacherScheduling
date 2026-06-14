@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +12,10 @@ export async function GET(request: NextRequest) {
     }
 
     const teachers = await prisma.teacher.findMany({
-      include: { user: { select: { name: true, email: true } } },
+        include: {
+          user: { select: { name: true, email: true } },
+          qualifications: { select: { subjectId: true } },
+        },
       orderBy: { createdAt: "desc" },
     });
 
@@ -37,13 +41,14 @@ export async function POST(request: NextRequest) {
 
     // Generate temporary password
     const tempPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10).toUpperCase();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     // Create user and teacher
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        password: tempPassword,
+        password: hashedPassword,
         role: "TEACHER",
         teacher: { create: {} },
       },
