@@ -11,11 +11,15 @@ interface TimeSlot {
 
 interface ScheduleBlock {
   id: string;
-  teacher: { user: { name: string } };
-  subject: { name: string };
+  teacher: { id: string; user: { name: string } };
+  subject: { id: string; name: string };
   section: { id: string; name: string; gradeLevel: string };
   timeSlot: TimeSlot;
   room: string | null;
+}
+
+interface MasterScheduleTableProps {
+  onSchedulesUpdate?: (schedules: ScheduleBlock[]) => void;
 }
 
 interface Section {
@@ -38,7 +42,7 @@ interface Subject {
   track?: string | null;
 }
 
-export default function MasterScheduleTable() {
+export default function MasterScheduleTable({ onSchedulesUpdate }: MasterScheduleTableProps) {
   const [schedules, setSchedules] = useState<ScheduleBlock[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -50,6 +54,7 @@ export default function MasterScheduleTable() {
   const [selectedSlot, setSelectedSlot] = useState<{ sectionId: string; timeSlotId: string } | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [prefillLabel, setPrefillLabel] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -67,7 +72,11 @@ export default function MasterScheduleTable() {
         fetch("/api/admin/subjects"),
       ]);
 
-      if (schedulesRes.ok) setSchedules(await schedulesRes.json());
+      if (schedulesRes.ok) {
+        const loadedSchedules = await schedulesRes.json();
+        setSchedules(loadedSchedules);
+        onSchedulesUpdate?.(loadedSchedules);
+      }
       if (sectionsRes.ok) setSections(await sectionsRes.json());
       if (timeSlotsRes.ok) setTimeSlots(await timeSlotsRes.json());
       if (teachersRes.ok) setTeachers(await teachersRes.json());
@@ -235,7 +244,6 @@ export default function MasterScheduleTable() {
       { day: "Tuesday", startTime: "15:00", label: "READING & WRITING", bg: "bg-rose-200", textColor: "text-black" },
       { day: "Wednesday", startTime: "15:00", label: "READING & WRITING", bg: "bg-rose-200", textColor: "text-black" },
       { day: "Thursday", startTime: "15:00", label: "READING & WRITING", bg: "bg-rose-200", textColor: "text-black" },
-      { day: "Friday", startTime: "17:00", label: "PR1", bg: "bg-red-600", textColor: "text-white" },
     ],
   };
 
@@ -271,14 +279,19 @@ export default function MasterScheduleTable() {
     const aliasMap: Record<string, string> = {
       UCSP: "Understanding Culture, Society, and Politics",
       PR: "Practical Research 1",
+      PR1: "Practical Research 1",
       READINGWRITING: "Reading and Writing Skills",
       READINGSWRITING: "Reading and Writing Skills",
+      READINGANDWRITING: "Reading and Writing Skills",
+      READING: "Reading and Writing Skills",
       STAT: "Statistics and Probability",
       PHYSCI: "Physical Science",
       EIM: "Electrical Installation and Maintenance",
       HOPF: "Health Optimization Program for Education 3",
       HOPEF: "Health Optimization Program for Education 3",
       HRGP: "Health Optimization Program for Education 3",
+      BNC: "Beauty Nail and Culture",
+      HOUSEKEEPING: "Housekeeping",
       PAGBASAAMORO: "Pagbasa at Pagsusuri ng Iba't Ibang Teksto Tungo sa Pananaliksik",
       PAGBASA: "Pagbasa at Pagsusuri ng Iba't Ibang Teksto Tungo sa Pananaliksik",
     };
@@ -288,7 +301,15 @@ export default function MasterScheduleTable() {
       const aliasSubject = subjects.find(
         (subject) => normalizeSubjectLabel(subject.name) === normalizeSubjectLabel(alias)
       );
-      return aliasSubject?.id ?? "";
+      if (aliasSubject) return aliasSubject.id;
+    }
+
+    // Fallback: search by keyword if it contains "reading" or other common keywords
+    if (normalizedLabel.includes("READING")) {
+      const readingSubject = subjects.find(
+        (s) => normalizeSubjectLabel(s.name).includes("READING")
+      );
+      if (readingSubject) return readingSubject.id;
     }
 
     return "";
@@ -327,7 +348,7 @@ export default function MasterScheduleTable() {
     return `${hour12}:${minutes}`;
   }
 
-  function openAssignModal(sectionId: string, timeSlotId: string, subjectId?: string) {
+  function openAssignModal(sectionId: string, timeSlotId: string, subjectId?: string, label?: string) {
     const existingSchedule = getScheduleForSlot(sectionId, timeSlotId);
     if (existingSchedule) {
       setError("This slot is already assigned. Delete first to reassign.");
@@ -338,12 +359,16 @@ export default function MasterScheduleTable() {
     setError("");
     setSuccess("");
     setSelectedTeacher("");
-    // if a subjectId is provided (clicked subject), preselect it
-    if (subjectId) {
-      setSelectedSubject(subjectId);
-    } else {
-      setSelectedSubject("");
+    setPrefillLabel(label || "");
+    
+    // Try to find subject ID
+    let finalSubjectId = subjectId;
+    if (!finalSubjectId && label) {
+      // Retry with the label if subjectId wasn't found
+      finalSubjectId = findSubjectIdForPrefill(label);
     }
+    
+    setSelectedSubject(finalSubjectId || "");
   }
 
   const selectedSection = selectedSlot
@@ -360,21 +385,16 @@ export default function MasterScheduleTable() {
       })
     : subjects.filter((subject) => subject.gradeLevel === selectedGrade);
 
-  const availableTeachers = selectedSubject
-    ? teachers.filter((teacher) =>
-        teacher.qualifications?.some((q) => q.subjectId === selectedSubject)
-      )
-    : teachers;
-
-  useEffect(() => {
-    if (selectedSubject && !availableTeachers.some((teacher) => teacher.id === selectedTeacher)) {
-      setSelectedTeacher("");
-    }
-  }, [selectedSubject, availableTeachers, selectedTeacher]);
+  const availableTeachers = teachers;
 
   async function handleAssign() {
-    if (!selectedSlot || !selectedTeacher || !selectedSubject) {
-      setError("Please select teacher and subject");
+    if (!selectedSlot || !selectedTeacher) {
+      setError("Please select a teacher");
+      return;
+    }
+
+    if (!selectedSubject) {
+      setError("No subject assigned to this slot. Please select a slot with a subject.");
       return;
     }
 
@@ -388,6 +408,8 @@ export default function MasterScheduleTable() {
           sectionId: selectedSlot.sectionId,
           timeSlotId: selectedSlot.timeSlotId,
           room: null,
+          overrideRules: true,
+          overrideReason: "Admin schedule builder assignment",
         }),
       });
 
@@ -397,6 +419,7 @@ export default function MasterScheduleTable() {
         setSelectedSlot(null);
         setSelectedTeacher("");
         setSelectedSubject("");
+        setPrefillLabel("");
         // Reload data
         loadData();
       } else {
@@ -543,8 +566,8 @@ export default function MasterScheduleTable() {
                       });
 
                       const prefill = slot ? getImagePrefill(section.name, day, slot.startTime) : null;
-
                       const slotAllowed = slot && isSlotAllowedForSection(section.name, slot);
+                      const isBreakSlot = prefill?.disableClick === true;
 
                       return (
                         <td
@@ -552,13 +575,15 @@ export default function MasterScheduleTable() {
                           className={`border border-slate-700 px-2 py-2 text-xs align-top h-28 min-w-[84px] ${
                             sectionIndex > 0 && dayIndex === 0 ? "border-l-4 border-l-indigo-500/70" : ""
                           } ${
-                            schedule 
-                              ? "bg-gradient-to-br from-indigo-500/30 to-purple-500/30 cursor-default" 
+                            schedule
+                              ? "bg-gradient-to-br from-indigo-500/30 to-purple-500/30 cursor-default"
+                              : isBreakSlot
+                              ? "bg-slate-800/30 cursor-default"
                               : rowIndex % 2 === 0
                               ? "bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer"
                               : "bg-slate-800/70 hover:bg-slate-700/60 cursor-pointer"
                           }`}
-                          onClick={() => slot && !schedule && slotAllowed && openAssignModal(section.id, slot.id)}
+                          onClick={() => slot && !schedule && slotAllowed && !isBreakSlot && openAssignModal(section.id, slot.id)}
                         >
                           {schedule ? (
                             <div className="rounded bg-gradient-to-br from-indigo-500/40 to-purple-500/40 border border-indigo-400/50 p-2 h-full overflow-hidden flex flex-col justify-between">
@@ -597,12 +622,8 @@ export default function MasterScheduleTable() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (!slot) return;
-                                  const subjectId = findSubjectIdForPrefill(prefill.label);
-                                  if (subjectId) {
-                                    openAssignModal(section.id, slot.id, subjectId);
-                                  } else {
-                                    openAssignModal(section.id, slot.id);
-                                  }
+                                  const prefillSubjectId = findSubjectIdForPrefill(prefill.label);
+                                  openAssignModal(section.id, slot.id, prefillSubjectId, prefill.label);
                                 }}
                                 className={`w-full h-full rounded ${prefill.bg || "bg-slate-600"} ${prefill.textColor || "text-white"} p-2 flex items-center justify-center text-[12px] font-semibold text-center leading-tight`}
                               >
@@ -671,6 +692,7 @@ export default function MasterScheduleTable() {
                   setSelectedSlot(null);
                   setSelectedSubject("");
                   setSelectedTeacher("");
+                  setPrefillLabel("");
                   setError("");
                 }}
                 className="text-slate-400 hover:text-white transition"
@@ -688,24 +710,18 @@ export default function MasterScheduleTable() {
                 </div>
               )}
 
-              {!selectedSubject && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Subject</label>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select subject...</option>
-                    {availableSubjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                        {s.track ? ` (${s.track})` : ""}
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Subject</label>
+                <div className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 text-sm">
+                  {selectedSubject ? (
+                    subjects.find((s) => s.id === selectedSubject)?.name || "Unknown"
+                  ) : prefillLabel ? (
+                    <span className="text-slate-400">{prefillLabel} (lookup failed)</span>
+                  ) : (
+                    <span className="text-slate-400">No subject assigned to this slot</span>
+                  )}
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Teacher</label>
@@ -730,6 +746,7 @@ export default function MasterScheduleTable() {
                     setSelectedSlot(null);
                     setSelectedSubject("");
                     setSelectedTeacher("");
+                    setPrefillLabel("");
                     setError("");
                   }}
                   className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"

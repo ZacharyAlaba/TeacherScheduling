@@ -40,6 +40,8 @@ interface Schedule {
   room: string | null;
 }
 
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
 export default function ScheduleBuilderPage() {
   const router = useRouter();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -297,17 +299,40 @@ export default function ScheduleBuilderPage() {
     }))
     .filter((section) => !showIncompleteOnly || section.subjectProgress.length > 0);
 
-  const timetableSchedule = selectedTeacherSchedules.map((schedule) => ({
-    day: schedule.timeSlot.day,
-    timeSlot: `${formatTime(schedule.timeSlot.startTime)}-${formatTime(schedule.timeSlot.endTime)}`,
-    subject: schedule.subject.name,
-    section: schedule.section.name,
-    room: schedule.room,
-  }));
+  const fixedBreakSlots = [
+    { startTime: "09:45", endTime: "10:00" },
+    { startTime: "12:00", endTime: "13:00" },
+  ];
+
+  const timetableSchedule = [
+    ...selectedTeacherSchedules.map((schedule) => ({
+      day: schedule.timeSlot.day,
+      timeSlot: `${formatTime(schedule.timeSlot.startTime)}-${formatTime(schedule.timeSlot.endTime)}`,
+      subject: schedule.subject.name,
+      section: schedule.section.name,
+      room: schedule.room,
+    })),
+    ...WEEK_DAYS.flatMap((day) => [
+      {
+        day,
+        timeSlot: `${formatTime(fixedBreakSlots[0].startTime)}-${formatTime(fixedBreakSlots[0].endTime)}`,
+        subject: "RECESS",
+        section: "",
+        room: null,
+      },
+      {
+        day,
+        timeSlot: `${formatTime(fixedBreakSlots[1].startTime)}-${formatTime(fixedBreakSlots[1].endTime)}`,
+        subject: "LUNCH BREAK",
+        section: "",
+        room: null,
+      },
+    ]),
+  ];
 
   const timetableSlots = Array.from(
     new Map(
-      timeSlots.map((slot) => {
+      [...timeSlots, ...fixedBreakSlots].map((slot) => {
         const startTime = formatTime(slot.startTime);
         const endTime = formatTime(slot.endTime);
         return [`${startTime}-${endTime}`, { startTime, endTime }] as const;
@@ -350,7 +375,7 @@ export default function ScheduleBuilderPage() {
             </div>
           </div>
 
-          <MasterScheduleTable />
+          <MasterScheduleTable onSchedulesUpdate={setSchedules} />
         </div>
 
         <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 p-6">

@@ -1,8 +1,8 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type StudentItem = {
   id: string;
@@ -144,6 +144,10 @@ export default function TeacherAttendancePage() {
   }, [attendanceRecords]);
 
   useEffect(() => {
+    if (!selectedSection || !selectedSubjectId) {
+      return;
+    }
+
     const nextStatus: Record<string, string> = {};
     const nextRemarks: Record<string, string> = {};
 
@@ -158,9 +162,21 @@ export default function TeacherAttendancePage() {
       }
     });
 
-    setStatusDrafts(nextStatus);
-    setRemarksDrafts(nextRemarks);
-  }, [selectedStudents, selectedSubjectId, gradingPeriod, recordLookup]);
+    const isStatusEqual =
+      Object.keys(nextStatus).length === Object.keys(statusDrafts).length &&
+      Object.keys(nextStatus).every((key) => statusDrafts[key] === nextStatus[key]);
+
+    const isRemarksEqual =
+      Object.keys(nextRemarks).length === Object.keys(remarksDrafts).length &&
+      Object.keys(nextRemarks).every((key) => remarksDrafts[key] === nextRemarks[key]);
+
+    if (!isStatusEqual) {
+      setStatusDrafts(nextStatus);
+    }
+    if (!isRemarksEqual) {
+      setRemarksDrafts(nextRemarks);
+    }
+  }, [selectedStudents, selectedSection, selectedSubjectId, gradingPeriod, recordLookup, remarksDrafts, statusDrafts]);
 
   async function saveAttendance(studentId: string) {
     if (!selectedSectionId || !selectedSubjectId || !selectedSection) {
@@ -235,12 +251,14 @@ export default function TeacherAttendancePage() {
           </div>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => router.push("/teacher")}
               className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
             >
               Back to Dashboard
             </button>
             <button
+              type="button"
               onClick={() => signOut({ callbackUrl: "/login/teacher" })}
               className="rounded-xl bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
             >
