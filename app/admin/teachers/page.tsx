@@ -8,6 +8,10 @@ interface Teacher {
   id: string;
   user: { name: string; email: string };
   createdAt: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }
 
 export default function TeachersPage() {
@@ -15,15 +19,20 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    email: "",
+    password: "",
+    dateOfBirth: "",
+    gender: "",
+    phone: "",
+    address: ""
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [signupLinkCopied, setSignupLinkCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
-  const [bulkImporting, setBulkImporting] = useState(false);
-  const [bulkImportResult, setBulkImportResult] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [signupUrl, setSignupUrl] = useState("/signup");
 
   useEffect(() => {
@@ -38,9 +47,14 @@ export default function TeachersPage() {
       const response = await fetch("/api/admin/teachers");
       if (response.ok) {
         setTeachers(await response.json());
+        setErrorMessage(null);
+      } else {
+        const errorBody = await response.json().catch(() => ({}));
+        setErrorMessage(errorBody.error || "Failed to fetch teachers.");
       }
     } catch (error) {
       console.error("Failed to fetch teachers:", error);
+      setErrorMessage("Failed to fetch teachers. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -60,13 +74,13 @@ export default function TeachersPage() {
 
       if (response.ok) {
         const result = await response.json();
-        setFormData({ name: "", email: "" });
+        setFormData({ name: "", email: "", password: "", dateOfBirth: "", gender: "", phone: "", address: "" });
         setEditingId(null);
         setShowForm(false);
         setSuccessMessage(
           editingId
             ? "Teacher updated successfully."
-            : `Teacher created successfully. Temporary password: ${result.password}`
+            : "Teacher created successfully."
         );
         await fetchTeachers();
         window.setTimeout(() => setSuccessMessage(null), 8000);
@@ -101,44 +115,20 @@ export default function TeachersPage() {
   }
 
   async function handleBulkImport(e: FormEvent) {
-    e.preventDefault();
-
-    if (!bulkImportFile) {
-      alert("Please select a CSV file");
-      return;
-    }
-
-    setBulkImporting(true);
-    setBulkImportResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", bulkImportFile);
-
-      const response = await fetch("/api/admin/teachers/bulk-import", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-      if (response.ok) {
-        setBulkImportResult(result);
-        setBulkImportFile(null);
-        setShowBulkImport(false);
-        await fetchTeachers();
-      } else {
-        alert(`Error: ${result.error || "Failed to import teachers."}`);
-      }
-    } catch (error) {
-      console.error("Failed to import teachers:", error);
-      alert("Failed to import teachers");
-    } finally {
-      setBulkImporting(false);
-    }
+    // Bulk import disabled
+    return;
   }
 
   function handleEdit(teacher: Teacher) {
-    setFormData({ name: teacher.user.name, email: teacher.user.email });
+    setFormData({
+      name: teacher.user.name,
+      email: teacher.user.email,
+      password: "",
+      dateOfBirth: teacher.dateOfBirth ?? "",
+      gender: teacher.gender ?? "",
+      phone: teacher.phone ?? "",
+      address: teacher.address ?? "",
+    });
     setEditingId(teacher.id);
     setShowForm(true);
   }
@@ -230,13 +220,64 @@ export default function TeachersPage() {
                   className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Password {editingId ? "(leave blank to keep)" : "*"}</label>
+                <input
+                  type="password"
+                  required={!editingId}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Date of Birth</label>
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Gender</label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Address</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
-                    setFormData({ name: "", email: "" });
+                    setFormData({ name: "", email: "", password: "", dateOfBirth: "", gender: "", phone: "", address: "" });
                     setSuccessMessage(null);
                   }}
                   className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold"
@@ -267,7 +308,7 @@ export default function TeachersPage() {
             <button
               type="button"
               onClick={() => {
-                setFormData({ name: "", email: "" });
+                setFormData({ name: "", email: "", password: "", dateOfBirth: "", gender: "", phone: "", address: "" });
                 setEditingId(null);
                 setSuccessMessage(null);
                 setShowForm(true);
@@ -276,102 +317,10 @@ export default function TeachersPage() {
             >
               Add Teacher
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowBulkImport((current) => !current);
-                setBulkImportResult(null);
-                setBulkImportFile(null);
-              }}
-              className="px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold"
-            >
-              {showBulkImport ? "Cancel" : "Bulk Import"}
-            </button>
+            
           </div>
         </div>
-        {showBulkImport && (
-          <div className="mb-8 p-6 bg-slate-800 rounded-lg border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">Bulk Import Teachers</h2>
-            <p className="text-slate-400 mb-6">
-              Upload a CSV file with columns: name, email
-            </p>
-
-            <form onSubmit={handleBulkImport} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">CSV File *</label>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setBulkImportFile(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 file:bg-blue-600 file:text-white file:px-4 file:py-2 file:rounded file:border-0 file:cursor-pointer file:mr-4"
-                  required
-                />
-              </div>
-
-              <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                <p className="text-sm text-slate-300 mb-3">CSV Format Example:</p>
-                <pre className="text-xs text-slate-400 overflow-x-auto">
-name,email
-John Doe,john@school.edu
-Jane Smith,jane@school.edu
-                </pre>
-              </div>
-
-              <button
-                type="submit"
-                disabled={bulkImporting}
-                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50"
-              >
-                {bulkImporting ? "Importing..." : "Import Teachers"}
-              </button>
-            </form>
-
-            {bulkImportResult && (
-              <div className="mt-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
-                    <p className="text-green-300 text-sm font-medium">Successfully Added</p>
-                    <p className="text-2xl font-bold text-green-400">{bulkImportResult.success}</p>
-                  </div>
-                  {bulkImportResult.failed > 0 && (
-                    <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-                      <p className="text-red-300 text-sm font-medium">Failed</p>
-                      <p className="text-2xl font-bold text-red-400">{bulkImportResult.failed}</p>
-                    </div>
-                  )}
-                </div>
-
-                {bulkImportResult.created?.length > 0 && (
-                  <div className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
-                    <p className="text-white font-semibold mb-3">Successfully Created Teachers:</p>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {bulkImportResult.created.map((teacher: any, idx: number) => (
-                        <div key={idx} className="text-sm text-slate-300 p-2 bg-slate-800 rounded flex justify-between items-center">
-                          <span>{teacher.name}</span>
-                          <span className="font-mono text-green-400 font-medium">{teacher.email}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {bulkImportResult.errors?.length > 0 && (
-                  <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/30">
-                    <p className="text-red-300 font-semibold mb-3">Import Errors:</p>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {bulkImportResult.errors.map((error: any, idx: number) => (
-                        <div key={idx} className="text-sm text-red-300 p-2 bg-red-900/20 rounded">
-                          <p className="font-medium">Row {error.row}: {error.name}</p>
-                          <p className="text-red-400 text-xs">{error.error}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        
         {successMessage && !showForm && (
           <div className="mb-6 rounded-lg border border-emerald-500 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             {successMessage}

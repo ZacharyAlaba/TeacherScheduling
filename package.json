@@ -10,15 +10,18 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "seed:supabase": "tsx scripts/seed-supabase.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^2.4.3",
+    "csv-parse": "^5.5.6",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
+    "nanoid": "^4.0.2",
     "next": "14.2.14",
     "next-auth": "^4.24.7",
     "react": "^18.3.1",
